@@ -110,6 +110,9 @@
   .panel .hint{ color:var(--ink-soft); font-size:13px; margin-bottom:20px; }
 
   .field{ margin-bottom:16px; }
+  .field label.check{ display:flex; align-items:center; gap:8px; text-transform:none; letter-spacing:0; font-size:13px; color:var(--ink); cursor:pointer; margin-bottom:0; }
+  .field label.check input{ width:15px; height:15px; accent-color:var(--green); margin:0; }
+  .check-hint{ font-size:11.5px; color:var(--ink-soft); margin-top:5px; }
   .field label{ display:block; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); margin-bottom:6px; }
   .field input[type=text], .field input[type=number], .field input[type=date], .field select{
     width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:3px;
@@ -430,13 +433,31 @@
       </div>
 
       <div class="field">
-        <label>Prazo</label>
+        <label id="labelPrazo">Prazo</label>
         <div class="row2">
           <div class="unit-input"><input type="number" id="fPrazo" value="720" min="1" step="1"><span>dias</span></div>
           <select id="fPrazoAtalho">
             <option value="">atalhos…</option>
             <option value="30">30 dias</option>
             <option value="180">6 meses</option>
+            <option value="365">1 ano</option>
+            <option value="720">2 anos</option>
+            <option value="1095">3 anos</option>
+            <option value="1825">5 anos</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="check"><input type="checkbox" id="fRolar"> Reinvestir ao vencer (rolagem)</label>
+        <div class="check-hint">Ao vencer, o total líquido entra num papel igual, repetidamente.</div>
+      </div>
+      <div class="field" id="wrapHorizonte" style="display:none;">
+        <label for="fHorizonte">Horizonte total</label>
+        <div class="row2">
+          <div class="unit-input"><input type="number" id="fHorizonte" value="720" min="1" step="1"><span>dias</span></div>
+          <select id="fHorizonteAtalho">
+            <option value="">atalhos…</option>
             <option value="365">1 ano</option>
             <option value="720">2 anos</option>
             <option value="1095">3 anos</option>
@@ -688,6 +709,8 @@
       principal: Math.max(0, num(raw.principal)),
       aporte: Math.max(0, num(raw.aporte)),
       prazo, trib,
+      rolar: raw.rolar === true,
+      horizonte: Math.max(prazo, Math.round(num(raw.horizonte, prazo))),
       aliqFixa: Math.min(100, Math.max(0, num(raw.aliqFixa))),
       taxaAnual: num(raw.taxaAnual),
       tag: String(raw.tag == null ? '' : raw.tag).slice(0, 80),
@@ -753,6 +776,16 @@
     if(e.target.value) $('fPrazo').value = e.target.value;
   });
 
+  $('fHorizonteAtalho').addEventListener('change', (e)=>{
+    if(e.target.value) $('fHorizonte').value = e.target.value;
+  });
+
+  $('fRolar').addEventListener('change', ()=>{
+    const on = $('fRolar').checked;
+    $('wrapHorizonte').style.display = on ? '' : 'none';
+    $('labelPrazo').textContent = on ? 'Prazo de cada ciclo' : 'Prazo';
+  });
+
   $('cdiInput').addEventListener('input', ()=>{
     const v = parseFloat($('cdiInput').value);
     cdi = isNaN(v) ? 0 : v;
@@ -769,6 +802,8 @@
     const aporte = Math.max(0, parseFloat($('fAporte').value) || 0);
     const prazo = Math.max(1, parseInt($('fPrazo').value) || 1);
     const trib = $('fTrib').value;
+    const rolar = $('fRolar').checked;
+    const horizonte = rolar ? Math.max(prazo, parseInt($('fHorizonte').value) || prazo) : prazo;
     const aliqFixa = parseFloat($('fAliqFixa').value) || 0;
     let taxaAnual, tag;
     if(tipoAtual === 'cdi'){
@@ -782,7 +817,7 @@
     const tribLabel = trib==='isento' ? 'Isento de IR' : trib==='fixo' ? ('IR fixo ' + aliqFixa + '%') : 'Tabela regressiva';
 
     items.push({
-      id: ++seq, name, principal, aporte, prazo, trib, aliqFixa, taxaAnual, tag, tribLabel,
+      id: ++seq, name, principal, aporte, prazo, rolar, horizonte, trib, aliqFixa, taxaAnual, tag, tribLabel,
       color: paletteSwatch[(items.length) % paletteSwatch.length]
     });
 
@@ -815,8 +850,8 @@
     return { bruto, rend, iof, ir, liquido: valor + rend - iof - ir };
   }
 
-  // Cada aporte e um lote com relogio de IR proprio: o inicial fica o prazo inteiro,
-  // o do mes 23 fica so 30 dias. Por isso a apuracao e sempre lote a lote.
+  // Cada aporte e um lote com relogio de IR proprio: o inicial fica o ciclo inteiro,
+  // o do mes seguinte fica menos. Por isso a apuracao e sempre lote a lote.
   function lotesAte(item, dia){
     const out = [];
     if(item.principal > 0) out.push({ valor: item.principal, dias: dia });
@@ -827,8 +862,8 @@
     return out;
   }
 
-  // Apura a posicao inteira num dia qualquer, somando lote a lote.
-  function apuraAte(item, dia){
+  // Apura UM ciclo isolado, `dia` dias apos a sua abertura.
+  function apuraCiclo(item, dia){
     let aportado = 0, rend = 0, iof = 0, ir = 0;
     for(const l of lotesAte(item, dia)){
       const bruto = l.valor * Math.pow(1 + item.taxaAnual/100, l.dias/365);
@@ -837,13 +872,58 @@
       aportado += l.valor; rend += r; iof += i;
       ir += Math.max(0, r - i) * (aliquotaIR(l.dias, item.trib, item.aliqFixa)/100);
     }
-    return { aportado, rend, iof, ir, bruto: aportado + rend, liquido: aportado + rend - iof - ir };
+    return { aportado, rend, iof, ir, liquido: aportado + rend - iof - ir };
   }
 
-  // Com aportes, (liquido/aportado)^(365/prazo) mente: o dinheiro do ultimo mes
-  // nao trabalhou o prazo inteiro. A taxa anual honesta e a TIR do fluxo.
+  // Sem rolagem, o horizonte e o proprio prazo.
+  function horizonteDe(item){
+    return item.rolar ? Math.max(item.prazo, item.horizonte || item.prazo) : item.prazo;
+  }
+
+  // Apura a posicao inteira num dia qualquer, percorrendo a linha do tempo em ciclos.
+  // A cada vencimento o liquido vira o capital do ciclo seguinte: o imposto pago ali
+  // e definitivo e reduz o montante que continua rendendo. Num isento isso nao custa
+  // nada; num tributado, prende a aliquota na faixa do ciclo curto.
+  function apuraAte(item, dia){
+    const H = horizonteDe(item);
+    const ate = Math.max(0, Math.min(dia, H));
+    const ciclo = Math.max(1, item.prazo);
+
+    let capital = item.principal;   // capital que abre o ciclo corrente
+    let aportado = item.principal;  // dinheiro novo; reinvestimento nao conta como aporte
+    let rend = 0;
+    let iofRol = 0, irRol = 0;      // imposto ja pago nas rolagens: dinheiro que saiu
+    let iofPend = 0, irPend = 0;    // imposto do ciclo em aberto, devido so no resgate
+    let inicio = 0;
+
+    while(inicio < ate){
+      const fim = Math.min(inicio + ciclo, H);
+      // so ha rolagem em vencimento intermediario; o ultimo e resgate, nao reinvestimento
+      const rola = ate >= fim && fim < H;
+      const sub = { principal: capital, aporte: item.aporte, prazo: fim - inicio,
+                    taxaAnual: item.taxaAnual, trib: item.trib, aliqFixa: item.aliqFixa };
+      const a = apuraCiclo(sub, Math.min(ate, fim) - inicio);
+
+      aportado += a.aportado - capital; // so os aportes novos deste ciclo
+      rend += a.rend;
+
+      if(!rola){ iofPend = a.iof; irPend = a.ir; break; }
+      iofRol += a.iof; irRol += a.ir;
+      capital = a.liquido;
+      inicio = fim;
+    }
+
+    // posicao = o que esta na conta: so o imposto ja realizado saiu de la
+    const posicao = aportado + rend - iofRol - irRol;
+    return { aportado, rend, iof: iofRol + iofPend, ir: irRol + irPend,
+             posicao, liquido: posicao - iofPend - irPend };
+  }
+
+  // Com aportes ou rolagem, (liquido/aportado)^(365/prazo) mente. A taxa anual
+  // honesta e a TIR do fluxo de caixa real ate o horizonte.
   function taxaLiquidaAnual(item, liquido){
-    const ls = lotesAte(item, item.prazo);
+    const H = horizonteDe(item);
+    const ls = lotesAte({ principal:item.principal, aporte:item.aporte, prazo:H }, H);
     if(!ls.length) return 0;
     if(liquido <= 0) return -100;
     const vf = (r) => ls.reduce((s,l) => s + l.valor * Math.pow(1 + r, l.dias/365), 0);
@@ -856,23 +936,24 @@
   }
 
   function calc(item){
-    const a = apuraAte(item, item.prazo);
+    const a = apuraAte(item, horizonteDe(item));
     // com aportes a aliquota de IR vira uma media ponderada dos lotes
-    const aliqIR = a.rend > 0 ? (a.ir / a.rend) * 100 : aliquotaIR(item.prazo, item.trib, item.aliqFixa);
+    const aliqIR = a.rend > 0 ? (a.ir / a.rend) * 100 : aliquotaIR(horizonteDe(item), item.trib, item.aliqFixa);
     const rentLiqTotal = a.aportado > 0 ? (a.liquido/a.aportado - 1) * 100 : 0;
     const rentLiqAnual = taxaLiquidaAnual(item, a.liquido);
     const pctCDILiquido = cdi > 0 ? (rentLiqAnual/cdi) * 100 : 0;
 
-    return { aportado:a.aportado, bruto:a.bruto, rendBruto:a.rend, iof:a.iof,
+    return { aportado:a.aportado, bruto:a.posicao, rendBruto:a.rend, iof:a.iof,
              aliqIR, ir:a.ir, liquido:a.liquido, rentLiqTotal, rentLiqAnual, pctCDILiquido };
   }
 
   function seriesFor(item){
-    const meses = Math.max(1, Math.round(item.prazo/30));
+    const H = horizonteDe(item);
+    // ceil, nao round: com round um prazo de 365 dias parava a curva no dia 360
+    const meses = Math.max(1, Math.ceil(H/30));
     const pts = [];
     for(let m=0; m<=meses; m++){
-      const dias = Math.min(item.prazo, m*30);
-      pts.push({x:m, y: apuraAte(item, dias).bruto});
+      pts.push({x:m, y: apuraAte(item, Math.min(H, m*30)).posicao});
     }
     return pts;
   }
@@ -881,13 +962,13 @@
   // No modo liquido: do que rendeu naquele mes, o que sobraria apos IOF e IR
   // na aliquota vigente se o resgate fosse no fim do mes.
   function jurosDoMes(item, m, modo){
-    const d1 = Math.min(item.prazo, (m-1)*30);
-    const d2 = Math.min(item.prazo, m*30);
-    if(d1 >= item.prazo) return null; // ficha ja venceu: sem barra
+    const H = horizonteDe(item);
+    const d1 = Math.min(H, (m-1)*30);
+    const d2 = Math.min(H, m*30);
+    if(d1 >= H) return null; // ficha ja venceu: sem barra
 
     const a1 = apuraAte(item, d1), a2 = apuraAte(item, d2);
-    // o dinheiro depositado no periodo entrou por aporte, nao por juro
-    const bruto = (a2.bruto - a1.bruto) - (a2.aportado - a1.aportado);
+    const bruto = a2.rend - a1.rend;
     if(modo === 'bruto') return bruto;
     // fracao que sobraria se a posicao inteira fosse resgatada no fim do mes
     const sobra = a2.rend > 0 ? (a2.rend - a2.iof - a2.ir) / a2.rend : 1;
@@ -919,21 +1000,23 @@
     }
     wrap.innerHTML = items.map(item=>{
       const r = calc(item);
-      const anosLabel = item.prazo % 365 === 0 ? (item.prazo/365)+(item.prazo/365===1?' ano':' anos') : item.prazo+' dias';
+      const H = horizonteDe(item);
+      const anosLabel = H % 365 === 0 ? (H/365)+(H/365===1?' ano':' anos') : H+' dias';
+      const rolLabel = item.rolar ? ` · rolando a cada ${item.prazo}d` : '';
       return `
         <div class="ficha">
           <div class="swatch" style="background:${item.color}"></div>
           <div class="ficha-top">
             <button class="ficha-remove" title="Remover" onclick="__removeFicha(${item.id})">✕</button>
             <div class="ficha-name">${escapeHtml(item.name)}</div>
-            <div class="ficha-tag">${escapeHtml(item.tag)} · ${anosLabel}${item.aporte>0 ? ' · +'+fmtBRL(item.aporte)+'/mês' : ''}</div>
+            <div class="ficha-tag">${escapeHtml(item.tag)} · ${anosLabel}${rolLabel}${item.aporte>0 ? ' · +'+fmtBRL(item.aporte)+'/mês' : ''}</div>
           </div>
           <div class="perf"></div>
           <div class="ficha-body">
             <div class="kv"><span class="k">${item.aporte>0 ? 'Total aportado' : 'Aplicado'}</span><span class="v mono">${fmtBRL(r.aportado)}</span></div>
             <div class="kv"><span class="k">Rendimento bruto</span><span class="v mono">${fmtBRL(r.rendBruto)}</span></div>
             ${r.iof>0 ? `<div class="kv tax"><span class="k">IOF</span><span class="v mono">− ${fmtBRL(r.iof)}</span></div>` : ''}
-            <div class="kv tax"><span class="k">${item.tribLabel} (${item.aporte>0 && item.trib==='regressiva' ? 'efetiva ' : ''}${fmtPct(r.aliqIR,1)})</span><span class="v mono">− ${fmtBRL(r.ir)}</span></div>
+            <div class="kv tax"><span class="k">${item.tribLabel} (${(item.aporte>0||item.rolar) && item.trib==='regressiva' ? 'efetiva ' : ''}${fmtPct(r.aliqIR,1)})</span><span class="v mono">− ${fmtBRL(r.ir)}</span></div>
             <div class="kv net"><span class="k">Valor líquido</span><span class="v mono">${fmtBRL(r.liquido)}</span></div>
             <button class="btn-troca" onclick="__abrirTroca(${item.id})">⇄ Vale a troca?</button>
           </div>
