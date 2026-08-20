@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #F1F4EE;
+  --color-paper-alt: #E8ECE0;
+  --color-card: #FFFFFF;
+  --color-ink: #16241D;
+  --color-ink-soft: #4B5B50;
+  --color-green: #1E5B41;
+  --color-green-deep: #123B2A;
+  --color-green-line: #BFD1C4;
+  --color-gold: #B8862E;
+  --color-gold-soft: #E9D9B4;
+  --color-brick: #A23B2E;
+  --color-brick-soft: #F1DAD5;
+  --color-line: #D2CDBC;
+  --color-grid: #E4E0D0;
+
+  --font-serif: 'Zilla Slab', Georgia, serif;
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --radius-sheet: 4px;
+  --shadow-sheet: 0 1px 0 rgba(22,36,29,0.06), 0 8px 24px -12px rgba(22,36,29,0.25);
+}
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 90% -10%, rgba(184,134,46,0.08), transparent 60%),
+      var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--color-gold-soft); }
+  h1, h2, h3 { font-family: var(--font-serif); margin: 0; color: var(--color-green-deep); }
+  button { font-family: inherit; cursor: pointer; }
+  input, select { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--color-green); outline-offset: 2px; }
+}
+
+@layer utilities {
+  .tabular { font-variant-numeric: tabular-nums; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
