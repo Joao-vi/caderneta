@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import { aliquotaIR } from '../domain/tributacao.js';
-import { dataParaDias, diasParaData, isoDe } from '../domain/datas.js';
 import { fmtBRL, fmtPct } from '../domain/formato.js';
 import {
   equivalentePctCDI, simularFicar, simularTrocar, taxaMinimaOferta, veredito,
 } from '../domain/troca.js';
+import CampoPrazo from './CampoPrazo.jsx';
 import { eixoBase } from './chartSetup.js';
 import { Campo, Seg, Select, TextInput, UnitInput } from './ui.jsx';
 
@@ -19,7 +19,7 @@ const TOM = {
 export default function ModalTroca({ aberto, items, origemId, cdi, onClose }) {
   const [f, setF] = useState({
     origemId: null, disponivel: 0, nome: '', tipo: 'cdi', pctCDI: 130, pre: 16,
-    prazo: 90, prazoModo: 'dias', venc: '', teto: 5000, trib: 'regressiva', aliqFixa: 15,
+    prazo: 90, teto: 5000, trib: 'regressiva', aliqFixa: 15,
     horizonte: 90, horizonteModo: 'prazo', reapl: 'origem', reaplPct: 100,
   });
   const set = (campo) => (v) => setF((a) => ({ ...a, [campo]: v }));
@@ -32,7 +32,7 @@ export default function ModalTroca({ aberto, items, origemId, cdi, onClose }) {
     if (!org) return;
     setF((a) => ({
       ...a, origemId: org.id, disponivel: org.principal,
-      horizonteModo: 'prazo', prazoModo: 'dias',
+      horizonteModo: 'prazo',
     }));
   }, [aberto, origemId, items]);
 
@@ -83,16 +83,6 @@ export default function ModalTroca({ aberto, items, origemId, cdi, onClose }) {
   const status = veredito(delta, V);
   const equiv = A && B ? equivalentePctCDI(B.liquido, V, cfg, H, cdi) : null;
   const txMin = A && B ? taxaMinimaOferta(V, cfg, H) : null;
-
-  const notaPrazo = () => {
-    if (f.prazoModo === 'data') {
-      const d = f.venc ? dataParaDias(f.venc) : null;
-      if (d === null) return 'Escolha a data de vencimento.';
-      if (d < 1) return <span className="text-brick">A data precisa ser futura.</span>;
-      return <>≡ <b className="text-green-deep">{d}</b> dias corridos</>;
-    }
-    return <>vence em <b className="text-green-deep">{diasParaData(prazo).toLocaleDateString('pt-BR')}</b></>;
-  };
 
   const pontos = [];
   if (A && B) {
@@ -172,35 +162,7 @@ export default function ModalTroca({ aberto, items, origemId, cdi, onClose }) {
               )}
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="mb-4">
-                  <div className="mb-1.5 flex items-center justify-between gap-2">
-                    <label htmlFor="tPrazo" className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-soft">Prazo</label>
-                    <div className="flex shrink-0 overflow-hidden rounded-[3px] border border-line">
-                      {[['dias', 'dias'], ['data', 'vencimento']].map(([v, r]) => (
-                        <button key={v} type="button" aria-pressed={f.prazoModo === v}
-                          onClick={() => {
-                            set('prazoModo')(v);
-                            if (v === 'data') set('venc')(isoDe(diasParaData(prazo)));
-                          }}
-                          className={`border-r border-line px-2 py-0.5 font-mono text-[10.5px] last:border-r-0 ${
-                            f.prazoModo === v ? 'bg-green text-white' : 'bg-paper text-ink-soft'}`}>
-                          {r}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {f.prazoModo === 'dias' ? (
-                    <UnitInput id="tPrazo" type="number" min="1" step="1" unidade="dias" value={f.prazo} onChange={setEv('prazo')} />
-                  ) : (
-                    <TextInput id="tPrazo" type="date" value={f.venc}
-                      onChange={(e) => {
-                        set('venc')(e.target.value);
-                        const d = dataParaDias(e.target.value);
-                        if (d !== null && d >= 1) set('prazo')(d);
-                      }} />
-                  )}
-                  <div className="mt-1.5 font-mono text-[11.5px] text-ink-soft">{notaPrazo()}</div>
-                </div>
+                <CampoPrazo id="tPrazo" label="Prazo" dias={f.prazo} onDiasChange={set('prazo')} />
                 <Campo label="Teto de aporte" htmlFor="tTeto">
                   <UnitInput id="tTeto" type="number" min="0" step="100" unidade="R$" value={f.teto} onChange={setEv('teto')} />
                 </Campo>

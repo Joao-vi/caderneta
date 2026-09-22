@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App.jsx';
 import { STORAGE_KEY } from './domain/armazenamento.js';
@@ -38,15 +38,15 @@ describe('estado inicial', () => {
 describe('adicionar ficha', () => {
   it('calcula o líquido correto e o exibe no card', async () => {
     const { user } = setup();
-    // padrões do formulário: R$10.000, 130% do CDI, 720 dias, tabela regressiva
+    // padrões do formulário: R$10.000, 100% do CDI, 720 dias, tabela regressiva
     await adicionarFicha(user);
 
     const card = screen.getByRole('article');
     expect(within(card).getByText('CDB Teste')).toBeInTheDocument();
     // valor verificado independentemente em apuracao.test.js
-    expect(within(card).getByText('R$ 13.198,71')).toBeInTheDocument();
+    expect(within(card).getByText('R$ 12.414,80')).toBeInTheDocument();
     // rotuloPrazo só escreve "anos" em múltiplos exatos de 365; 720 não é
-    expect(within(card).getByText(/130% do CDI · 720 dias/)).toBeInTheDocument();
+    expect(within(card).getByText(/100% do CDI · 720 dias/)).toBeInTheDocument();
     expect(screen.getByText('1 investimento')).toBeInTheDocument();
   });
 
@@ -204,5 +204,73 @@ describe('persistência', () => {
     localStorage.setItem(STORAGE_KEY, '{corrompido');
     render(<App />);
     expect(screen.getByText(/Nenhuma ficha ainda/)).toBeInTheDocument();
+  });
+});
+
+describe('prazo por data de vencimento', () => {
+  // hoje fixo: as datas esperadas abaixo são literais, não derivadas do código
+  beforeEach(() => jest.useFakeTimers().setSystemTime(new Date(2026, 7, 20)));
+  afterEach(() => jest.useRealTimers());
+
+  const comTimers = () => userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+
+  it('em dias, mostra a data de vencimento equivalente', () => {
+    render(<App />);
+    // prazo padrão de 720 dias a partir de 20/08/2026
+    expect(screen.getByLabelText('Prazo')).toHaveAccessibleDescription('vence em 09/08/2028');
+  });
+
+  it('alterna para vencimento já preenchido com o prazo atual', async () => {
+    const user = comTimers();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'vencimento' }));
+    expect(screen.getByLabelText('Prazo')).toHaveValue('2028-08-09');
+  });
+
+  it('escolher uma data escreve o prazo em dias', async () => {
+    const user = comTimers();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'vencimento' }));
+    fireEvent.change(screen.getByLabelText('Prazo'), { target: { value: '2027-08-20' } });
+    expect(screen.getByLabelText('Prazo')).toHaveAccessibleDescription('≡ 365 dias corridos');
+  });
+
+  it('a data escolhida chega na ficha criada', async () => {
+    const user = comTimers();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'vencimento' }));
+    fireEvent.change(screen.getByLabelText('Prazo'), { target: { value: '2027-08-20' } });
+    await user.click(screen.getByRole('button', { name: /Adicionar à comparação/ }));
+    // 365 é múltiplo exato de 365, então rotuloPrazo escreve "1 ano"
+    expect(within(screen.getByRole('article')).getByText(/100% do CDI · 1 ano/)).toBeInTheDocument();
+  });
+
+  it('recusa data passada sem alterar o prazo', async () => {
+    const user = comTimers();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'vencimento' }));
+    fireEvent.change(screen.getByLabelText('Prazo'), { target: { value: '2020-01-01' } });
+    expect(screen.getByText('A data precisa ser futura.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'dias' }));
+    expect(screen.getByLabelText('Prazo')).toHaveValue(720); // intacto
+  });
+
+  it('o atalho continua funcionando e reflete na data', async () => {
+    const user = comTimers();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'vencimento' }));
+    await user.selectOptions(screen.getByLabelText('Atalhos de prazo'), '365');
+    expect(screen.getByLabelText('Prazo')).toHaveValue('2027-08-20');
+  });
+
+  it('o modal usa o mesmo controle', async () => {
+    const user = comTimers();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: /Adicionar à comparação/ }));
+    await user.click(screen.getByRole('button', { name: /Vale a troca/ }));
+    const modal = screen.getByRole('dialog');
+    await user.click(within(modal).getByRole('button', { name: 'vencimento' }));
+    // oferta tem prazo padrão de 90 dias
+    expect(within(modal).getByLabelText('Prazo')).toHaveValue('2026-11-18');
   });
 });

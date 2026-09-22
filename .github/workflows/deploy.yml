@@ -3,6 +3,9 @@ name: Deploy
 on:
   push:
     branches: [main]
+  # atualiza as cotações dos ETFs e o CDI depois do fechamento da B3 (20h de Brasília)
+  schedule:
+    - cron: '0 23 * * 1-5'
   workflow_dispatch:
 
 permissions:
@@ -36,6 +39,9 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      # se o Yahoo ou o BCB falharem, publica com os dados já versionados em public/dados
+      - run: npm run dados
+        continue-on-error: true
       - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

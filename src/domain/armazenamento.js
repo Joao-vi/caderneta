@@ -42,3 +42,52 @@ export function limparEstado() {
     /* nada a fazer */
   }
 }
+
+/* ── Aporte mensal em ETF: só os parâmetros do formulário, chave própria ── */
+
+export const STORAGE_KEY_ETF = 'caderneta.aporteEtf.v1';
+const ATIVOS_ETF = ['IVVB11', 'NASD11', 'ambos'];
+
+export function salvarParamsEtf(params) {
+  try {
+    localStorage.setItem(STORAGE_KEY_ETF, JSON.stringify(params));
+  } catch {
+    /* segue sem persistir */
+  }
+}
+
+/** Devolve só os campos válidos; o componente completa o resto com os padrões. */
+export function carregarParamsEtf() {
+  let dados;
+  try {
+    dados = JSON.parse(localStorage.getItem(STORAGE_KEY_ETF));
+  } catch {
+    return {};
+  }
+  if (!dados || typeof dados !== 'object') return {};
+
+  const params = {};
+  if (ATIVOS_ETF.includes(dados.ativos)) params.ativos = dados.ativos;
+  const aporte = Number(dados.aporte);
+  if (Number.isFinite(aporte) && aporte > 0) params.aporte = aporte;
+  const mes = /^\d{4}-(0[1-9]|1[0-2])$/;
+  if (mes.test(dados.inicio)) params.inicio = dados.inicio;
+  for (const campo of ['parada', 'retiradaInicio']) {
+    if (mes.test(dados[campo])) params[campo] = dados[campo];
+  }
+  for (const campo of ['parar', 'retirar', 'corrigir']) {
+    if (typeof dados[campo] === 'boolean') params[campo] = dados[campo];
+  }
+  if (dados.retiradaModo === 'pct' || dados.retiradaModo === 'fixo') params.retiradaModo = dados.retiradaModo;
+  for (const campo of ['retiradaPct', 'retiradaFixo']) {
+    const v = Number(dados[campo]);
+    if (dados[campo] !== '' && Number.isFinite(v) && v >= 0) params[campo] = v;
+  }
+  if (dados.regularidade === 'fixo' || dados.regularidade === 'variavel') params.regularidade = dados.regularidade;
+  for (const campo of ['chancePular', 'minimo']) {
+    const v = Number(dados[campo]);
+    if (dados[campo] !== '' && Number.isFinite(v) && v >= 0 && v <= 100) params[campo] = v;
+  }
+  if (Number.isInteger(dados.semente)) params.semente = dados.semente;
+  return params;
+}

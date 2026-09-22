@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import './components/chartSetup.js';
+import AporteEtf from './components/AporteEtf.jsx';
 import FichaCard from './components/FichaCard.jsx';
 import FormularioFicha from './components/FormularioFicha.jsx';
 import Hero from './components/Hero.jsx';
@@ -56,6 +57,7 @@ export default function App() {
 
         <Projecao items={items} />
         <TabelaComparativa items={items} cdi={cdi} />
+        <AporteEtf />
         <Referencias />
       </main>
 

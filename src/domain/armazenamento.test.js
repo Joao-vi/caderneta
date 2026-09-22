@@ -1,4 +1,6 @@
-import { STORAGE_KEY, carregarEstado, limparEstado, salvarEstado } from './armazenamento.js';
+import {
+  STORAGE_KEY, STORAGE_KEY_ETF, carregarEstado, carregarParamsEtf, limparEstado, salvarEstado, salvarParamsEtf,
+} from './armazenamento.js';
 
 beforeEach(() => localStorage.clear());
 
@@ -63,5 +65,37 @@ describe('persistência', () => {
     salvarEstado({ items: [], seq: 0, cdi: 13.9 });
     limparEstado();
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+});
+
+describe('parâmetros do aporte em ETF', () => {
+  const salvo = (dados) => localStorage.setItem(STORAGE_KEY_ETF, JSON.stringify(dados));
+
+  beforeEach(() => localStorage.clear());
+
+  it('devolve vazio sem nada salvo ou com lixo', () => {
+    expect(carregarParamsEtf()).toEqual({});
+    localStorage.setItem(STORAGE_KEY_ETF, '{quebrado');
+    expect(carregarParamsEtf()).toEqual({});
+  });
+
+  it('ida e volta preserva os campos válidos', () => {
+    const params = {
+      ativos: 'ambos', aporte: 500, inicio: '2022-03', regularidade: 'variavel',
+      chancePular: 30, minimo: 40, semente: 5, parar: true, parada: '2025-01',
+      retirar: true, retiradaInicio: '2025-06', retiradaModo: 'fixo', retiradaPct: 4,
+      retiradaFixo: 3000, corrigir: false,
+    };
+    salvarParamsEtf(params);
+    expect(carregarParamsEtf()).toEqual(params);
+  });
+
+  it('descarta campo inválido sem perder os outros', () => {
+    salvo({
+      ativos: 'PETR4', aporte: -1, inicio: '2022-13', regularidade: 'as vezes',
+      chancePular: 150, minimo: '', semente: 1.5, parar: 'sim', parada: '2025-02',
+      retirar: 1, retiradaInicio: 'jun', retiradaModo: 'tudo', retiradaPct: -4, retiradaFixo: 'x',
+    });
+    expect(carregarParamsEtf()).toEqual({ parada: '2025-02' });
   });
 });

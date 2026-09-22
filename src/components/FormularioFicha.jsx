@@ -1,20 +1,30 @@
-import { useState } from 'react';
-import { Campo, Painel, Seg, Select, TextInput, UnitInput } from './ui.jsx';
+import { useState } from 'react'
+import CampoPrazo from './CampoPrazo.jsx'
+import { Campo, Painel, Seg, Select, TextInput, UnitInput } from './ui.jsx'
 
 const INICIAL = {
-  name: '', principal: 10000, aporte: 0, tipo: 'cdi', pctCDI: 130, pre: 14,
-  prazo: 720, rolar: false, horizonte: 720, trib: 'regressiva', aliqFixa: 15,
-};
+  name: '',
+  principal: 10000,
+  aporte: 0,
+  tipo: 'cdi',
+  pctCDI: 100,
+  pre: 14,
+  prazo: 720,
+  rolar: false,
+  horizonte: 720,
+  trib: 'regressiva',
+  aliqFixa: 15,
+}
 
 export default function FormularioFicha({ onAdd }) {
-  const [f, setF] = useState(INICIAL);
-  const set = (campo) => (v) => setF((atual) => ({ ...atual, [campo]: v }));
-  const setEv = (campo) => (e) => set(campo)(e.target.value);
+  const [f, setF] = useState(INICIAL)
+  const set = (campo) => (v) => setF((atual) => ({ ...atual, [campo]: v }))
+  const setEv = (campo) => (e) => set(campo)(e.target.value)
 
   function submeter(e) {
-    e.preventDefault();
-    onAdd(f);
-    setF((atual) => ({ ...atual, name: '' }));
+    e.preventDefault()
+    onAdd(f)
+    setF((atual) => ({ ...atual, name: '' }))
   }
 
   return (
@@ -23,21 +33,47 @@ export default function FormularioFicha({ onAdd }) {
         <h2 className="mb-1 text-xl">Nova ficha</h2>
         <p className="mb-5 text-[13px] text-ink-soft">Adicione um investimento para comparar.</p>
 
-        <Campo label="Nome / instituição" htmlFor="fName">
+        <Campo
+          label="Nome / instituição"
+          htmlFor="fName"
+        >
           <TextInput
-            id="fName" type="text" value={f.name} onChange={setEv('name')}
+            id="fName"
+            type="text"
+            value={f.name}
+            onChange={setEv('name')}
             placeholder="Ex.: Banco X — CDB 2 anos"
           />
         </Campo>
 
         <div className="grid grid-cols-2 gap-3">
-          <Campo label="Valor inicial" htmlFor="fPrincipal">
-            <UnitInput id="fPrincipal" type="number" min="0" step="100" unidade="R$"
-              value={f.principal} onChange={setEv('principal')} />
+          <Campo
+            label="Valor inicial"
+            htmlFor="fPrincipal"
+          >
+            <UnitInput
+              id="fPrincipal"
+              type="number"
+              min="0"
+              step="100"
+              unidade="R$"
+              value={f.principal}
+              onChange={setEv('principal')}
+            />
           </Campo>
-          <Campo label="Aporte mensal" htmlFor="fAporte">
-            <UnitInput id="fAporte" type="number" min="0" step="100" unidade="R$"
-              value={f.aporte} onChange={setEv('aporte')} />
+          <Campo
+            label="Aporte mensal"
+            htmlFor="fAporte"
+          >
+            <UnitInput
+              id="fAporte"
+              type="number"
+              min="0"
+              step="100"
+              unidade="R$"
+              value={f.aporte}
+              onChange={setEv('aporte')}
+            />
           </Campo>
         </div>
 
@@ -54,38 +90,61 @@ export default function FormularioFicha({ onAdd }) {
         </Campo>
 
         {f.tipo === 'cdi' ? (
-          <Campo label="Percentual do CDI" htmlFor="fPctCDI">
-            <UnitInput id="fPctCDI" type="number" min="0" step="1" unidade="%"
-              value={f.pctCDI} onChange={setEv('pctCDI')} />
+          <Campo
+            label="Percentual do CDI"
+            htmlFor="fPctCDI"
+          >
+            <UnitInput
+              id="fPctCDI"
+              type="number"
+              min="0"
+              step="1"
+              unidade="%"
+              value={f.pctCDI}
+              onChange={setEv('pctCDI')}
+            />
           </Campo>
         ) : (
-          <Campo label="Taxa prefixada" htmlFor="fPre">
-            <UnitInput id="fPre" type="number" min="0" step="0.1" unidade="% a.a."
-              value={f.pre} onChange={setEv('pre')} />
+          <Campo
+            label="Taxa prefixada"
+            htmlFor="fPre"
+          >
+            <UnitInput
+              id="fPre"
+              type="number"
+              min="0"
+              step="0.1"
+              unidade="% a.a."
+              value={f.pre}
+              onChange={setEv('pre')}
+            />
           </Campo>
         )}
 
-        <Campo label={f.rolar ? 'Prazo de cada ciclo' : 'Prazo'} htmlFor="fPrazo">
-          <div className="grid grid-cols-2 gap-3">
-            <UnitInput id="fPrazo" type="number" min="1" step="1" unidade="dias"
-              value={f.prazo} onChange={setEv('prazo')} />
-            <Select aria-label="Atalhos de prazo" value=""
-              onChange={(e) => e.target.value && set('prazo')(e.target.value)}>
-              <option value="">atalhos…</option>
-              <option value="30">30 dias</option>
-              <option value="90">3 meses</option>
-              <option value="180">6 meses</option>
-              <option value="365">1 ano</option>
-              <option value="720">2 anos</option>
-              <option value="1095">3 anos</option>
-            </Select>
-          </div>
-        </Campo>
+        <CampoPrazo
+          id="fPrazo"
+          label={f.rolar ? 'Prazo de cada ciclo' : 'Prazo'}
+          dias={f.prazo}
+          onDiasChange={set('prazo')}
+          atalhos={[
+            ['30', '30 dias'],
+            ['90', '3 meses'],
+            ['180', '6 meses'],
+            ['365', '1 ano'],
+            ['720', '2 anos'],
+            ['1095', '3 anos'],
+          ]}
+        />
 
         <div className="mb-4">
-          <label htmlFor="fRolar" className="flex cursor-pointer items-center gap-2 text-[13px] text-ink">
+          <label
+            htmlFor="fRolar"
+            className="flex cursor-pointer items-center gap-2 text-[13px] text-ink"
+          >
             <input
-              id="fRolar" type="checkbox" checked={f.rolar}
+              id="fRolar"
+              type="checkbox"
+              checked={f.rolar}
               onChange={(e) => set('rolar')(e.target.checked)}
               className="h-[15px] w-[15px] accent-green"
             />
@@ -97,12 +156,25 @@ export default function FormularioFicha({ onAdd }) {
         </div>
 
         {f.rolar && (
-          <Campo label="Horizonte total" htmlFor="fHorizonte">
+          <Campo
+            label="Horizonte total"
+            htmlFor="fHorizonte"
+          >
             <div className="grid grid-cols-2 gap-3">
-              <UnitInput id="fHorizonte" type="number" min="1" step="1" unidade="dias"
-                value={f.horizonte} onChange={setEv('horizonte')} />
-              <Select aria-label="Atalhos de horizonte" value=""
-                onChange={(e) => e.target.value && set('horizonte')(e.target.value)}>
+              <UnitInput
+                id="fHorizonte"
+                type="number"
+                min="1"
+                step="1"
+                unidade="dias"
+                value={f.horizonte}
+                onChange={setEv('horizonte')}
+              />
+              <Select
+                aria-label="Atalhos de horizonte"
+                value=""
+                onChange={(e) => e.target.value && set('horizonte')(e.target.value)}
+              >
                 <option value="">atalhos…</option>
                 <option value="365">1 ano</option>
                 <option value="720">2 anos</option>
@@ -113,8 +185,15 @@ export default function FormularioFicha({ onAdd }) {
           </Campo>
         )}
 
-        <Campo label="Tributação" htmlFor="fTrib">
-          <Select id="fTrib" value={f.trib} onChange={setEv('trib')}>
+        <Campo
+          label="Tributação"
+          htmlFor="fTrib"
+        >
+          <Select
+            id="fTrib"
+            value={f.trib}
+            onChange={setEv('trib')}
+          >
             <option value="regressiva">Tabela regressiva (padrão CDB/Tesouro)</option>
             <option value="isento">Isento de IR (LCI, LCA, CRI, CRA, poupança)</option>
             <option value="fixo">Alíquota fixa personalizada</option>
@@ -122,9 +201,20 @@ export default function FormularioFicha({ onAdd }) {
         </Campo>
 
         {f.trib === 'fixo' && (
-          <Campo label="Alíquota de IR" htmlFor="fAliqFixa">
-            <UnitInput id="fAliqFixa" type="number" min="0" max="100" step="0.5" unidade="%"
-              value={f.aliqFixa} onChange={setEv('aliqFixa')} />
+          <Campo
+            label="Alíquota de IR"
+            htmlFor="fAliqFixa"
+          >
+            <UnitInput
+              id="fAliqFixa"
+              type="number"
+              min="0"
+              max="100"
+              step="0.5"
+              unidade="%"
+              value={f.aliqFixa}
+              onChange={setEv('aliqFixa')}
+            />
           </Campo>
         )}
 
@@ -136,5 +226,5 @@ export default function FormularioFicha({ onAdd }) {
         </button>
       </form>
     </Painel>
-  );
+  )
 }
