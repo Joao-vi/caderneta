@@ -1,4 +1,5 @@
 import { normalizarFicha } from './ficha.js';
+import { normalizarFichaBtc } from './fichaBtc.js';
 
 export const STORAGE_KEY = 'caderneta.v1';
 
@@ -90,4 +91,46 @@ export function carregarParamsEtf() {
   }
   if (Number.isInteger(dados.semente)) params.semente = dados.semente;
   return params;
+}
+
+/* ── Fichas de aporte em bitcoin: lista própria, chave própria ── */
+
+export const STORAGE_KEY_BTC = 'caderneta.btc.v1';
+
+export function salvarEstadoBtc(estado) {
+  try {
+    localStorage.setItem(STORAGE_KEY_BTC, JSON.stringify({ v: 1, ...estado }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function carregarEstadoBtc() {
+  let dados;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_BTC);
+    if (!raw) return null;
+    dados = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!dados || dados.v !== 1 || !Array.isArray(dados.items)) return null;
+
+  const items = dados.items.map(normalizarFichaBtc).filter(Boolean);
+  return {
+    items,
+    seq: Math.max(
+      Number.isFinite(Number(dados.seq)) ? Math.round(Number(dados.seq)) : 0,
+      items.reduce((m, i) => Math.max(m, i.id), 0),
+    ),
+  };
+}
+
+export function limparEstadoBtc() {
+  try {
+    localStorage.removeItem(STORAGE_KEY_BTC);
+  } catch {
+    /* nada a fazer */
+  }
 }

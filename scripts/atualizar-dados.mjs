@@ -1,5 +1,6 @@
 /**
- * Baixa o histórico dos ETFs, do CDI e do IPCA e grava JSONs estáticos em public/dados/.
+ * Baixa o histórico dos ETFs, do bitcoin, do CDI e do IPCA e grava JSONs
+ * estáticos em public/dados/.
  *
  * O site é estático e roda só no navegador: o Yahoo não aceita chamadas de
  * outra origem (CORS), então os dados são buscados aqui, no build, e servidos
@@ -13,6 +14,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ETFS = ['IVVB11', 'NASD11'];
+const CRIPTOS = ['BTC-USD'];
 const DADOS_DESDE = 2014; // o IVVB11 começa a ser negociado em abr/2014
 const DESTINO = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'dados');
 
@@ -24,14 +26,19 @@ async function baixarJson(url) {
   return resp.json();
 }
 
-/** Fechamento ajustado diário. Sem period1/period2 o Yahoo devolve semanal ou mensal. */
-async function baixarEtf(ticker) {
+/**
+ * Fechamento ajustado diário do Yahoo. Sem period1/period2 ele devolve semanal
+ * ou mensal. `simbolo` é o ticker do Yahoo — ETF da B3 leva sufixo `.SA`,
+ * cripto não leva e já vem em dólar, com os 7 dias da semana.
+ */
+async function baixarSerie(ticker, simbolo, moeda) {
   const agora = Math.floor(Date.now() / 1000);
   const url =
-    `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}.SA` +
+    `https://query1.finance.yahoo.com/v8/finance/chart/${simbolo}` +
     `?period1=0&period2=${agora}&interval=1d&events=div,split`;
   const r = (await baixarJson(url)).chart?.result?.[0];
   if (!r?.timestamp) throw new Error(`${ticker}: resposta sem série`);
+  if (r.meta.currency !== moeda) throw new Error(`${ticker}: veio em ${r.meta.currency}, esperava ${moeda}`);
 
   const offset = r.meta.gmtoffset ?? -10800;
   const fechamentos = r.indicators.adjclose?.[0]?.adjclose ?? r.indicators.quote[0].close;
@@ -46,8 +53,11 @@ async function baixarEtf(ticker) {
   });
   if (precos.length < 250) throw new Error(`${ticker}: só ${precos.length} pregões`);
 
-  return { ticker, fonte: 'Yahoo Finance — fechamento ajustado', atualizado: hoje, precos };
+  return { ticker, moeda, fonte: 'Yahoo Finance — fechamento ajustado', atualizado: hoje, precos };
 }
+
+const baixarEtf = (ticker) => baixarSerie(ticker, `${ticker}.SA`, 'BRL');
+const baixarCripto = (ticker) => baixarSerie(ticker, ticker, 'USD');
 
 /** Série do SGS como [[isoData, valor]]. O SGS limita séries diárias a 10 anos por consulta, então vai ano a ano. */
 async function baixarSgs(serie) {
@@ -83,6 +93,9 @@ const arquivos = {
   'ipca.json': await baixarIpca(),
   ...Object.fromEntries(
     await Promise.all(ETFS.map(async (t) => [`${t}.json`, await baixarEtf(t)])),
+  ),
+  ...Object.fromEntries(
+    await Promise.all(CRIPTOS.map(async (t) => [`${t}.json`, await baixarCripto(t)])),
   ),
 };
 

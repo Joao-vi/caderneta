@@ -12,7 +12,10 @@
  *
  * Séries de entrada vêm de public/dados: [[isoData, valor], ...] em ordem.
  */
-const DIA_MS = 86400000;
+import { calendarioDeAportes, primeiroPeriodoDisponivel } from './calendario.js';
+import { diasEntre, tirAnual } from './tir.js';
+
+export { tirAnual };
 
 const mesDe = (iso) => iso.slice(0, 7);
 
@@ -34,35 +37,23 @@ export function proximoMes(mes) {
   return m === 12 ? `${a + 1}-01` : `${a}-${String(m + 1).padStart(2, '0')}`;
 }
 
-function diasEntre(isoA, isoB) {
-  return Math.round((Date.parse(isoB) - Date.parse(isoA)) / DIA_MS);
-}
+/** Aporte no primeiro pregão de cada mês — o caso do módulo de ETF. */
+const MENSAL = { frequencia: 'mensal', dia: null };
 
 /**
  * Primeiro mês com aporte possível. Se o ETF estreou no meio do mês, aquele
  * mês não tem "primeiro pregão" — o primeiro aporte honesto é no seguinte.
- * Até o dia 5 ainda conta: feriado e fim de semana empurram o primeiro pregão
- * do mês para o dia 4 no pior caso (1º de janeiro numa sexta).
  */
 export function primeiroMesDisponivel(precos) {
-  const [primeiraData] = precos[0];
-  const mes = mesDe(primeiraData);
-  return Number(primeiraData.slice(8)) <= 5 ? mes : proximoMes(mes);
+  return primeiroPeriodoDisponivel(precos, MENSAL) ?? proximoMes(mesDe(precos[0][0]));
 }
 
 /** Primeiro pregão de cada mês, de `inicio` ('YYYY-MM') até o fim da série. */
 export function pregoesDeAporte(precos, inicio) {
   const primeiro = primeiroMesDisponivel(precos);
   const desde = inicio > primeiro ? inicio : primeiro;
-  const pregoes = [];
-  let mesAtual = null;
-  for (const [data, preco] of precos) {
-    const mes = mesDe(data);
-    if (mes < desde || mes === mesAtual) continue;
-    mesAtual = mes;
-    pregoes.push({ data, preco });
-  }
-  return pregoes;
+  return calendarioDeAportes(precos, { ...MENSAL, inicio: desde })
+    .map(({ data, preco }) => ({ data, preco }));
 }
 
 /**
@@ -86,29 +77,6 @@ export function criaFatorCdi(taxas) {
     return acumulado[lo];
   };
   return (isoA, isoB) => indice(isoB) / indice(isoA);
-}
-
-/**
- * TIR anual (base 365) de fluxos datados que valem `valorFinal` em `dataFinal`.
- * Aporte é valor positivo, saque é negativo. Como os saques sempre vêm depois
- * dos aportes, o valor futuro cresce com a taxa e a bisseção converge.
- */
-export function tirAnual(fluxos, dataFinal, valorFinal) {
-  if (!fluxos.length) return 0;
-  const saques = fluxos.some((f) => f.valor < 0);
-  if (valorFinal <= 0 && !saques) return -100;
-
-  const valorFuturo = (r) =>
-    fluxos.reduce((soma, a) => soma + a.valor * (1 + r) ** (diasEntre(a.data, dataFinal) / 365), 0);
-
-  let lo = -0.99;
-  let hi = 10;
-  for (let k = 0; k < 200; k += 1) {
-    const meio = (lo + hi) / 2;
-    if (valorFuturo(meio) < valorFinal) lo = meio;
-    else hi = meio;
-  }
-  return ((lo + hi) / 2) * 100;
 }
 
 /**

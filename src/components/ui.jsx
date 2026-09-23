@@ -80,3 +80,33 @@ export function Painel({ children, className = '' }) {
     </div>
   );
 }
+
+export const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+/** '2024-03-15' -> 'mar/24'. Aceita também 'YYYY-MM'. */
+export const rotuloMes = (iso) => `${MESES[Number(iso.slice(5, 7)) - 1]}/${iso.slice(2, 4)}`;
+
+/** '2024-03-15' -> '15/03/2024'. */
+export const rotuloData = (iso) => iso.split('-').reverse().join('/');
+
+/** Par mês/ano para escolher um 'YYYY-MM' dentro de um intervalo disponível. */
+export function SeletorMes({ rotulo, valor, onChange, primeiro, ultimo, hint }) {
+  const [ano, mes] = valor.split('-');
+  const anos = [];
+  for (let a = Number(primeiro.slice(0, 4)); a <= Number(ultimo.slice(0, 4)); a += 1) anos.push(a);
+  return (
+    <Campo label={rotulo} hint={hint}>
+      <div className="grid grid-cols-2 gap-2">
+        <Select aria-label={`Mês: ${rotulo}`} value={mes} onChange={(e) => onChange(`${ano}-${e.target.value}`)}>
+          {MESES.map((m, i) => {
+            const v = String(i + 1).padStart(2, '0');
+            return <option key={v} value={v}>{m}</option>;
+          })}
+        </Select>
+        <Select aria-label={`Ano: ${rotulo}`} value={ano} onChange={(e) => onChange(`${e.target.value}-${mes}`)}>
+          {anos.map((a) => <option key={a} value={a}>{a}</option>)}
+        </Select>
+      </div>
+    </Campo>
+  );
+}

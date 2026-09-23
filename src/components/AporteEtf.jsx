@@ -7,16 +7,14 @@ import { carregarParamsEtf, salvarParamsEtf } from '../domain/armazenamento.js';
 import { fmtBRL, fmtNum, fmtPct } from '../domain/formato.js';
 import { ETFS, useDadosEtf } from '../hooks/useDadosEtf.js';
 import { eixoBase } from './chartSetup.js';
-import { Campo, Painel, Select, Seg, UnitInput } from './ui.jsx';
+import {
+  Campo, Painel, Seg, SeletorMes, Select, UnitInput, rotuloData, rotuloMes,
+} from './ui.jsx';
 
 const CORES = {
   IVVB11: '#1E5B41', NASD11: '#2B4C6F', cdi: '#B8862E', aportado: '#4B5B50', retirado: '#A23B2E',
 };
 const NOMES = { IVVB11: 'IVVB11 · S&P 500', NASD11: 'NASD11 · Nasdaq-100' };
-const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-
-const rotuloMes = (iso) => `${MESES[Number(iso.slice(5, 7)) - 1]}/${iso.slice(2, 4)}`;
-const rotuloData = (iso) => iso.split('-').reverse().join('/');
 
 function mesesAtras(n) {
   const d = new Date();
@@ -82,27 +80,6 @@ function Traco({ cor, tracejado }) {
       className={`inline-block h-0 w-4 border-t-[3px] ${tracejado ? 'border-dashed' : ''}`}
       style={{ borderColor: cor }}
     />
-  );
-}
-
-function SeletorMes({ rotulo, valor, onChange, primeiro, ultimo, hint }) {
-  const [ano, mes] = valor.split('-');
-  const anos = [];
-  for (let a = Number(primeiro.slice(0, 4)); a <= Number(ultimo.slice(0, 4)); a += 1) anos.push(a);
-  return (
-    <Campo label={rotulo} hint={hint}>
-      <div className="grid grid-cols-2 gap-2">
-        <Select aria-label={`Mês: ${rotulo}`} value={mes} onChange={(e) => onChange(`${ano}-${e.target.value}`)}>
-          {MESES.map((m, i) => {
-            const v = String(i + 1).padStart(2, '0');
-            return <option key={v} value={v}>{m}</option>;
-          })}
-        </Select>
-        <Select aria-label={`Ano: ${rotulo}`} value={ano} onChange={(e) => onChange(`${e.target.value}-${mes}`)}>
-          {anos.map((a) => <option key={a} value={a}>{a}</option>)}
-        </Select>
-      </div>
-    </Campo>
   );
 }
 

@@ -3,9 +3,10 @@ name: Deploy
 on:
   push:
     branches: [main]
-  # atualiza as cotações dos ETFs e o CDI depois do fechamento da B3 (20h de Brasília)
+  # atualiza as cotações depois do fechamento da B3 (20h de Brasília). Todo dia,
+  # não só nos úteis: o bitcoin negocia no fim de semana e a B3 não.
   schedule:
-    - cron: '0 23 * * 1-5'
+    - cron: '0 23 * * *'
   workflow_dispatch:
 
 permissions:

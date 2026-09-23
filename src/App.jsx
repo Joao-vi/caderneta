@@ -1,78 +1,92 @@
-import { useState } from 'react';
 import './components/chartSetup.js';
-import AporteEtf from './components/AporteEtf.jsx';
-import FichaCard from './components/FichaCard.jsx';
-import FormularioFicha from './components/FormularioFicha.jsx';
-import Hero from './components/Hero.jsx';
-import ModalTroca from './components/ModalTroca.jsx';
-import Projecao from './components/Projecao.jsx';
+import { useAba } from './components/Abas.jsx';
+import Hero, { DiscoCdi, Medalhao } from './components/Hero.jsx';
 import Referencias from './components/Referencias.jsx';
-import TabelaComparativa from './components/TabelaComparativa.jsx';
+import Bitcoin from './paginas/Bitcoin.jsx';
+import Etfs from './paginas/Etfs.jsx';
+import RendaFixa from './paginas/RendaFixa.jsx';
+import { fmtUSD } from './domain/formato.js';
+import { useDadosBtc } from './hooks/useDadosBtc.js';
 import { useFichas } from './hooks/useFichas.js';
+import { useFichasBtc } from './hooks/useFichasBtc.js';
+import { rotuloData } from './components/ui.jsx';
+
+const destaque = (texto) => <em className="font-medium italic text-gold">{texto}</em>;
 
 export default function App() {
-  const { items, cdi, adicionar, remover, limpar, alterarCdi } = useFichas();
-  const [trocaId, setTrocaId] = useState(null);
+  const [aba, irPara] = useAba();
+  const fixa = useFichas();
+  const btc = useFichasBtc();
+  const dadosBtc = useDadosBtc();
 
-  function confirmarLimpeza() {
-    if (window.confirm('Apagar todas as fichas salvas neste navegador?')) limpar();
-  }
+  const ultimo = dadosBtc.dados?.precos?.at(-1) ?? null;
+
+  const cabecalhos = {
+    'renda-fixa': {
+      tag: 'comparador de renda fixa',
+      titulo: <>Quanto o seu {destaque('CDB')} realmente&nbsp;paga.</>,
+      subtitulo: 'Monte fichas de CDB, LCI/LCA ou Tesouro, ajuste prazo e tributação, e compare o '
+        + 'líquido de verdade — depois do IR e do IOF.',
+      medalhao: <DiscoCdi cdi={fixa.cdi} onCdiChange={fixa.alterarCdi} />,
+    },
+    etfs: {
+      tag: 'aporte mensal em ETF',
+      titulo: <>Quem aportou {destaque('todo mês')}, quanto teria&nbsp;hoje.</>,
+      subtitulo: 'Simula aportes mensais em IVVB11 e NASD11 sobre as cotações reais, com o CDI '
+        + 'nas mesmas datas como régua — e uma fase de retiradas para testar se o dinheiro dura.',
+      medalhao: null,
+    },
+    bitcoin: {
+      tag: 'aportes em bitcoin',
+      titulo: <>Com que {destaque('frequência')} vale&nbsp;aportar?</>,
+      subtitulo: 'Um mesmo orçamento, dividido em aportes mensais, semanais ou diários sobre a '
+        + 'cotação real em dólar. A resposta é menos empolgante do que parece — e é o ponto.',
+      medalhao: ultimo ? (
+        <Medalhao
+          rotulo="BTC hoje"
+          valor={fmtUSD(ultimo[1], 0).replace(/\s/g, ' ')}
+          rodape={`em ${rotuloData(ultimo[0])}`}
+        />
+      ) : null,
+    },
+  };
 
   return (
     <>
-      <Hero cdi={cdi} onCdiChange={alterarCdi} />
+      <Hero aba={aba} onAba={irPara} {...cabecalhos[aba]} />
 
       <main className="mx-auto max-w-[1180px] px-6 pb-20 pt-10">
-        <div className="grid items-start gap-7 lg:grid-cols-[340px_1fr]">
-          <FormularioFicha onAdd={adicionar} />
+        {aba === 'renda-fixa' && (
+          <RendaFixa
+            items={fixa.items}
+            cdi={fixa.cdi}
+            adicionar={fixa.adicionar}
+            remover={fixa.remover}
+            limpar={fixa.limpar}
+          />
+        )}
 
-          <div>
-            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-[22px]">Suas fichas</h2>
-              <span className="flex items-center gap-3 font-mono text-xs text-ink-soft">
-                <span>{items.length} {items.length === 1 ? 'investimento' : 'investimentos'}</span>
-                {items.length > 0 && (
-                  <button type="button" onClick={confirmarLimpeza}
-                          className="text-ink-soft underline underline-offset-2 hover:text-brick">
-                    limpar tudo
-                  </button>
-                )}
-              </span>
-            </div>
+        {aba === 'etfs' && <Etfs />}
 
-            <div className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(270px,1fr))]">
-              {items.length === 0 ? (
-                <div className="col-span-full rounded-sheet border border-dashed border-line bg-card px-6 py-10 text-center text-ink-soft">
-                  Nenhuma ficha ainda. Preencha o formulário ao lado e clique em{' '}
-                  <strong>“Adicionar à comparação”</strong>.
-                </div>
-              ) : (
-                items.map((item) => (
-                  <FichaCard key={item.id} item={item} cdi={cdi} onRemove={remover} onTroca={setTrocaId} />
-                ))
-              )}
-            </div>
-          </div>
-        </div>
+        {aba === 'bitcoin' && (
+          <Bitcoin
+            status={dadosBtc.status}
+            dados={dadosBtc.dados}
+            items={btc.items}
+            adicionar={btc.adicionar}
+            adicionarTrio={btc.adicionarTrio}
+            remover={btc.remover}
+            limpar={btc.limpar}
+          />
+        )}
 
-        <Projecao items={items} />
-        <TabelaComparativa items={items} cdi={cdi} />
-        <AporteEtf />
-        <Referencias />
+        <Referencias aba={aba} />
       </main>
 
       <footer className="px-6 pb-12 pt-8 text-center text-xs text-ink-soft">
         Ferramenta educacional de simulação — não é recomendação de investimento. Confira sempre
         as condições reais junto à instituição financeira.
       </footer>
-
-      <ModalTroca
-        aberto={trocaId !== null && items.length > 0}
-        items={items}
-        origemId={trocaId}
-        cdi={cdi}
-        onClose={() => setTrocaId(null)}
-      />
     </>
   );
 }
